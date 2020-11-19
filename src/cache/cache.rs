@@ -339,10 +339,7 @@ pub fn storage_from_config(config: &Config, pool: &ThreadPool) -> Arc<dyn Storag
                         } else if let Some(ref url) = *url {
                             Some(ServiceAccountInfo::URL(url.clone()))
                         } else {
-                            warn!(
-                            "No SCCACHE_GCS_KEY_PATH specified-- no authentication will be used."
-                        );
-                            None
+                            Some(ServiceAccountInfo::DefaultServiceAccount)
                         };
 
                     let gcs_read_write_mode = match rw_mode {

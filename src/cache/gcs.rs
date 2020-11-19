@@ -178,6 +178,7 @@ pub struct GCSCredentialProvider {
 pub enum ServiceAccountInfo {
     URL(String),
     AccountKey(ServiceAccountKey),
+    DefaultServiceAccount,
 }
 
 fn deserialize_gcp_key<'de, D>(deserializer: D) -> std::result::Result<Vec<u8>, D::Error>
@@ -452,6 +453,42 @@ impl GCSCredentialProvider {
         )
     }
 
+    // https://cloud.google.com/compute/docs/access/create-enable-service-accounts-for-instances#applications
+    fn request_new_token_from_default_service_account(
+        &self,
+        client: &Client,
+    ) -> SFuture<GCSCredential> {
+        #[derive(Deserialize)]
+        struct Response {
+            access_token: String,
+            expires_in: i64,
+            #[allow(dead_code)]
+            token_type: TokenType,
+        }
+
+        #[derive(Deserialize)]
+        enum TokenType {
+            Bearer,
+        }
+
+        Box::new(
+            client
+                .get(
+                    "http://metadata.google.internal/computeMetadata/v1/\
+                     instance/service-accounts/default/token",
+                )
+                .header("Metadata-Flavor", "Google")
+                .send()
+                .and_then(|mut response| response.json::<Response>())
+                .map(|response| GCSCredential {
+                    token: response.access_token,
+                    expiration_time: chrono::offset::Utc::now()
+                        + chrono::Duration::seconds(response.expires_in),
+                })
+                .map_err(Into::into),
+        )
+    }
+
     pub fn credentials(&self, client: &Client) -> SFuture<GCSCredential> {
         let mut future_opt = self.cached_credentials.borrow_mut();
 
@@ -467,6 +504,9 @@ impl GCSCredentialProvider {
                     self.request_new_token(sa_key, client)
                 }
                 ServiceAccountInfo::URL(ref url) => self.request_new_token_from_tcauth(url, client),
+                ServiceAccountInfo::DefaultServiceAccount => {
+                    self.request_new_token_from_default_service_account(client)
+                }
             };
             *future_opt = Some(credentials.shared());
         };
