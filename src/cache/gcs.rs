@@ -47,26 +47,39 @@ const QUERY: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'#').add(b'<').add(b
 struct Bucket {
     name: String,
     client: Client,
+    prefix: Option<std::path::PathBuf>,
 }
 
 impl fmt::Display for Bucket {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Bucket(name={})", self.name)
+        if let Some(prefix) = &self.prefix {
+            write!(f, "Bucket(name={}, prefix={})", self.name, prefix.display())
+        } else {
+            write!(f, "Bucket(name={})", self.name)
+        }
     }
 }
 
 impl Bucket {
-    pub fn new(name: String) -> Result<Bucket> {
+    pub fn new(name: String, prefix: Option<std::path::PathBuf>) -> Result<Bucket> {
         let client = Client::new();
 
-        Ok(Bucket { name, client })
+        Ok(Bucket {
+            name,
+            client,
+            prefix,
+        })
     }
 
     fn get(&self, key: &str, cred_provider: &Option<GCSCredentialProvider>) -> SFuture<Vec<u8>> {
+        let key = match &self.prefix {
+            Some(prefix) => prefix.join(key),
+            None => key.into(),
+        };
         let url = format!(
             "https://www.googleapis.com/download/storage/v1/b/{}/o/{}?alt=media",
             utf8_percent_encode(&self.name, PATH_SEGMENT),
-            utf8_percent_encode(key, PATH_SEGMENT)
+            utf8_percent_encode(&key.to_string_lossy(), PATH_SEGMENT),
         );
 
         let client = self.client.clone();
@@ -118,10 +131,14 @@ impl Bucket {
         content: Vec<u8>,
         cred_provider: &Option<GCSCredentialProvider>,
     ) -> SFuture<()> {
+        let key = match &self.prefix {
+            Some(prefix) => prefix.join(key),
+            None => key.into(),
+        };
         let url = format!(
             "https://www.googleapis.com/upload/storage/v1/b/{}/o?name={}&uploadType=media",
             utf8_percent_encode(&self.name, PATH_SEGMENT),
-            utf8_percent_encode(key, QUERY)
+            utf8_percent_encode(&key.to_string_lossy(), QUERY),
         );
 
         let client = self.client.clone();
@@ -539,9 +556,10 @@ impl GCSCache {
         bucket: String,
         credential_provider: Option<GCSCredentialProvider>,
         rw_mode: RWMode,
+        prefix: Option<std::path::PathBuf>,
     ) -> Result<GCSCache> {
         Ok(GCSCache {
-            bucket: Rc::new(Bucket::new(bucket)?),
+            bucket: Rc::new(Bucket::new(bucket, prefix)?),
             rw_mode,
             credential_provider,
         })

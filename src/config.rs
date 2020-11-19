@@ -179,6 +179,7 @@ pub struct GCSCacheConfig {
     pub cred_path: Option<PathBuf>,
     pub url: Option<String>,
     pub rw_mode: GCSCacheRWMode,
+    pub prefix: Option<PathBuf>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -508,11 +509,15 @@ fn config_from_env() -> EnvConfig {
                 GCSCacheRWMode::ReadOnly
             }
         };
+
+        let prefix = env::var_os("SCCACHE_GCS_PREFIX").map(PathBuf::from);
+
         GCSCacheConfig {
             bucket,
             cred_path,
             url,
             rw_mode,
+            prefix,
         }
     });
 

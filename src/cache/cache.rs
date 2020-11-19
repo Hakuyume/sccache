@@ -306,10 +306,11 @@ pub fn storage_from_config(config: &Config, pool: &ThreadPool) -> Arc<dyn Storag
                 ref cred_path,
                 ref url,
                 rw_mode,
+                ref prefix,
             }) => {
                 debug!(
-                    "Trying GCS bucket({}, {:?}, {:?}, {:?})",
-                    bucket, cred_path, url, rw_mode
+                    "Trying GCS bucket({}, {:?}, {:?}, {:?}, {:?})",
+                    bucket, cred_path, url, rw_mode, prefix
                 );
                 #[cfg(feature = "gcs")]
                 {
@@ -350,7 +351,12 @@ pub fn storage_from_config(config: &Config, pool: &ThreadPool) -> Arc<dyn Storag
                     let gcs_cred_provider = service_account_info_opt
                         .map(|info| GCSCredentialProvider::new(gcs_read_write_mode, info));
 
-                    match GCSCache::new(bucket.to_owned(), gcs_cred_provider, gcs_read_write_mode) {
+                    match GCSCache::new(
+                        bucket.to_owned(),
+                        gcs_cred_provider,
+                        gcs_read_write_mode,
+                        prefix.to_owned(),
+                    ) {
                         Ok(s) => {
                             trace!("Using GCSCache");
                             return Arc::new(s);
