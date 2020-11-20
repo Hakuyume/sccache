@@ -126,6 +126,9 @@ counted_array!(pub static ARGS: [ArgInfo<gcc::ArgData>; _] = [
     take_arg!("-mllvm", OsString, Separated, PassThrough),
     take_arg!("-plugin-arg", OsString, Concatenated('-'), PassThrough),
     take_arg!("-target", OsString, Separated, PassThrough),
+    take_arg!("-target-cpu", OsString, Separated, PassThrough),
+    take_arg!("-target-feature", OsString, Separated, PassThrough),
+    take_arg!("-triple", OsString, Separated, PassThrough),
     flag!("-verify", PreprocessorArgumentFlag),
 ]);
 
